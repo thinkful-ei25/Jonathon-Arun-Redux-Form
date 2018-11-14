@@ -1,5 +1,5 @@
 import React from 'react';
-import { reduxForm, Field } from 'redux-form';
+import { reduxForm, Field, SubmissionError } from 'redux-form';
 import Input from '../input';
 
 function required(value) {
@@ -32,7 +32,37 @@ function isANumber(value) {
 
 class DeliveryProblemForm extends React.Component {
   onSubmit(values) {
-    console.log(values);
+    console.log(JSON.stringify(values));
+    return fetch(
+      'https://us-central1-delivery-form-api.cloudfunctions.net/api/report',
+      {
+        method: 'POST',
+        mode: 'cors',
+        body: JSON.stringify(values),
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+      .then((res) => {
+        if (!res.ok) {
+          if (
+            res.headers.has('content-type') &&
+            res.headers.get('content-type').startsWith('application/json')
+          ) {
+            return res.json().then((error) => Promise.reject(error));
+          }
+          return Promise.reject({ code: res.status, message: res.statusText });
+        }
+        return;
+      })
+      .catch((error) => {
+        const { reason, message, location } = error;
+        if (reason === 'ValidationError') {
+          return Promise.reject(new SubmissionError({ [location]: message }));
+        }
+        return Promise.reject(
+          new SubmissionError({ _error: 'Error submitting message' })
+        );
+      });
   }
 
   render() {
@@ -51,6 +81,7 @@ class DeliveryProblemForm extends React.Component {
           element="select"
           label="What is your issue?"
         >
+          <option></option>
           <option value="not-delivered">My Delivery has not arrived</option>
           <option value="wrong-item">Wrong item was delivered</option>
           <option value="missing-part">Part I ordered was missing</option>
